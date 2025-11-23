@@ -112,8 +112,7 @@ def get_main_keyboard():
     keyboard = [
         ['📅 Расписание на сегодня', '📋 Текущая неделя'],
         ['📆 Следующая неделя', '🗓️ Выбрать день'],
-        ['🔄 Обновить расписание', '/start'],
-        ['❓ Помощь']
+        ['🔄 Обновить расписание', '❓ Помощь']
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -242,8 +241,6 @@ async def update_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
     
     return SELECTING_ACTION
-
-# Остальные функции остаются без изменений...
 
 # Показать расписание на сегодня
 async def show_today_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -484,7 +481,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 📆 **Следующая неделя** - показать расписание следующей недели
 🗓️ **Выбрать день** - выбрать конкретный день из любой недели
 🔄 **Обновить расписание** - запустить парсер для получения актуального расписания
-🔄 **/start** - перезапустить бота и обновить меню
 
 ⚡ **Быстрые команды:**
 /start - запустить бота
@@ -568,7 +564,7 @@ async def handle_message_selecting_day(update: Update, context: ContextTypes.DEF
         )
         return SELECTING_DAY
 
-# Команда /start
+# Команда /start - ВЫНЕСЕНА ИЗ ConversationHandler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
     logger.info(f"Пользователь {user.first_name} запустил бота")
@@ -617,13 +613,24 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-# Основная функция
+# Основная функция - ИСПРАВЛЕННАЯ ВЕРСИЯ
 def main():
     application = Application.builder().token(token=TOKEN).build()
     
-    # ConversationHandler для управления состояниями
+    # ОБРАТИТЕ ВНИМАНИЕ: CommandHandler('start', start) добавлен ДО ConversationHandler
+    # Это гарантирует, что команда /start будет обработана правильно
+    
+    # Сначала добавляем все CommandHandler
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("today", today_command))
+    application.add_handler(CommandHandler("current_week", current_week_command))
+    application.add_handler(CommandHandler("next_week", next_week_command))
+    application.add_handler(CommandHandler("update_schedule", update_schedule_command))
+    application.add_handler(CommandHandler("help", help_command))
+    
+    # Затем добавляем ConversationHandler
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[],  # Теперь пусто, так как команды обрабатываются выше
         states={
             SELECTING_ACTION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_selecting_action)
@@ -638,13 +645,7 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
     
-    # Добавляем обработчики команд
     application.add_handler(conv_handler)
-    application.add_handler(CommandHandler("today", today_command))
-    application.add_handler(CommandHandler("current_week", current_week_command))
-    application.add_handler(CommandHandler("next_week", next_week_command))
-    application.add_handler(CommandHandler("update_schedule", update_schedule_command))
-    application.add_handler(CommandHandler("help", help_command))
     
     # Запускаем бота
     print("Бот запущен...")
