@@ -200,7 +200,7 @@ def run_schedule_parser_sync():
         print(f"Исключение при запуске парсера: {str(e)}")
         return False, f"Ошибка при запуске парсера: {str(e)}"
 
-# Обновление расписания - ИСПРАВЛЕННАЯ ВЕРСИЯ
+# Обновление расписания
 async def update_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
     logger.info(f"Пользователь {user.first_name} запустил обновление расписания")
@@ -208,7 +208,7 @@ async def update_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Отправляем сообщение о начале обновления
     status_message = await update.message.reply_text(
         "🔄 Запускаю обновление расписания...\n"
-        "Это может занять несколько минут...\n"
+        "Это может зануть несколько минут...\n"
         "⏳ Пожалуйста, подождите...",
         reply_markup=get_main_keyboard()
     )
@@ -217,7 +217,6 @@ async def update_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Запускаем парсер
         success, result_message = run_schedule_parser_sync()
         
-        # Вместо редактирования сообщения отправляем новое
         if success:
             await update.message.reply_text(
                 f"✅ {result_message}\n"
@@ -313,11 +312,10 @@ async def show_current_week_schedule(update: Update, context: ContextTypes.DEFAU
                 message += f"      👨‍🏫 {lesson['teacher']}\n"
                 message += f"      🏫 {lesson['room']} | {lesson['type']}\n\n"
     
-    # Если сообщение слишком длинное, разбиваем на части
     if len(message) > 4096:
         parts = [message[i:i+4096] for i in range(0, len(message), 4096)]
         for i, part in enumerate(parts):
-            if i == len(parts) - 1:  # Последняя часть
+            if i == len(parts) - 1:
                 await update.message.reply_text(
                     part, 
                     reply_markup=get_main_keyboard()
@@ -358,11 +356,10 @@ async def show_next_week_schedule(update: Update, context: ContextTypes.DEFAULT_
                 message += f"      👨‍🏫 {lesson['teacher']}\n"
                 message += f"      🏫 {lesson['room']} | {lesson['type']}\n\n"
     
-    # Если сообщение слишком длинное, разбиваем на части
     if len(message) > 4096:
         parts = [message[i:i+4096] for i in range(0, len(message), 4096)]
         for i, part in enumerate(parts):
-            if i == len(parts) - 1:  # Последняя часть
+            if i == len(parts) - 1:
                 await update.message.reply_text(
                     part, 
                     reply_markup=get_main_keyboard()
@@ -497,6 +494,55 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     )
     return SELECTING_ACTION
 
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.message.from_user
+    logger.info(f"Пользователь {user.first_name} запустил бота")
+    
+    # Очищаем данные пользователя при перезапуске
+    context.user_data.clear()
+    
+    # Показываем какое сегодня число по версии бота
+    today_date = get_current_schedule_date()
+    today_weekday = get_russian_weekday(datetime.now().weekday())
+    logger.info(f"Сегодня: {today_weekday}, {today_date}")
+    
+    await update.message.reply_text(
+        f"Привет, {user.first_name}! 👋\n"
+        f"Сегодня: {today_weekday}, {today_date}\n"
+        "Я бот для просмотра расписания занятий группы 201/2.\n\n"
+        "Выберите действие:",
+        reply_markup=get_main_keyboard()
+    )
+    
+    return SELECTING_ACTION
+
+# Команда /today
+async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await show_today_schedule(update, context)
+
+# Команда /current_week
+async def current_week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await show_current_week_schedule(update, context)
+
+# Команда /next_week
+async def next_week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await show_next_week_schedule(update, context)
+
+# Команда /update_schedule
+async def update_schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    return await update_schedule(update, context)
+
+# Отмена
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.message.from_user
+    logger.info(f"Пользователь {user.first_name} отменил действие")
+    await update.message.reply_text(
+        'Действие отменено',
+        reply_markup=get_main_keyboard()
+    )
+    return ConversationHandler.END
+
 # Обработка текстовых сообщений в состоянии SELECTING_ACTION
 async def handle_message_selecting_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = update.message.text
@@ -564,76 +610,21 @@ async def handle_message_selecting_day(update: Update, context: ContextTypes.DEF
         )
         return SELECTING_DAY
 
-# Команда /start - ВЫНЕСЕНА ИЗ ConversationHandler
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    logger.info(f"Пользователь {user.first_name} запустил бота")
-    
-    # Очищаем данные пользователя при перезапуске
-    context.user_data.clear()
-    
-    # Показываем какое сегодня число по версии бота
-    today_date = get_current_schedule_date()
-    today_weekday = get_russian_weekday(datetime.now().weekday())
-    logger.info(f"Сегодня: {today_weekday}, {today_date}")
-    
-    await update.message.reply_text(
-        f"Привет, {user.first_name}! 👋\n"
-        f"Сегодня: {today_weekday}, {today_date}\n"
-        "Я бот для просмотра расписания занятий группы 201/2.\n\n"
-        "Выберите действие:",
-        reply_markup=get_main_keyboard()
-    )
-    
-    return SELECTING_ACTION
-
-# Команда /today
-async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return await show_today_schedule(update, context)
-
-# Команда /current_week
-async def current_week_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return await show_current_week_schedule(update, context)
-
-# Команда /next_week
-async def next_week_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return await show_next_week_schedule(update, context)
-
-# Команда /update_schedule
-async def update_schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    return await update_schedule(update, context)
-
-# Отмена
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-    logger.info(f"Пользователь {user.first_name} отменил действие")
-    await update.message.reply_text(
-        'Действие отменено',
-        reply_markup=get_main_keyboard()
-    )
-    return ConversationHandler.END
-
 # Основная функция - ИСПРАВЛЕННАЯ ВЕРСИЯ
 def main():
     application = Application.builder().token(token=TOKEN).build()
     
-    # ОБРАТИТЕ ВНИМАНИЕ: CommandHandler('start', start) добавлен ДО ConversationHandler
-    # Это гарантирует, что команда /start будет обработана правильно
-    
-    # Сначала добавляем все CommandHandler
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("today", today_command))
-    application.add_handler(CommandHandler("current_week", current_week_command))
-    application.add_handler(CommandHandler("next_week", next_week_command))
-    application.add_handler(CommandHandler("update_schedule", update_schedule_command))
-    application.add_handler(CommandHandler("help", help_command))
-    
-    # Затем добавляем ConversationHandler
+    # ConversationHandler должен быть ПЕРВЫМ и иметь start в entry_points
     conv_handler = ConversationHandler(
-        entry_points=[],  # Теперь пусто, так как команды обрабатываются выше
+        entry_points=[CommandHandler('start', start)],
         states={
             SELECTING_ACTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_selecting_action)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_selecting_action),
+                CommandHandler('today', today_command),
+                CommandHandler('current_week', current_week_command),
+                CommandHandler('next_week', next_week_command),
+                CommandHandler('update_schedule', update_schedule_command),
+                CommandHandler('help', help_command)
             ],
             SELECTING_WEEK: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_selecting_week)
@@ -642,10 +633,20 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_selecting_day)
             ],
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel)],
+        allow_reentry=True
     )
     
+    # Добавляем ConversationHandler первым
     application.add_handler(conv_handler)
+    
+    # Затем добавляем остальные CommandHandler как отдельные обработчики
+    # Они будут работать как глобальные команды
+    application.add_handler(CommandHandler("today", today_command))
+    application.add_handler(CommandHandler("current_week", current_week_command))
+    application.add_handler(CommandHandler("next_week", next_week_command))
+    application.add_handler(CommandHandler("update_schedule", update_schedule_command))
+    application.add_handler(CommandHandler("help", help_command))
     
     # Запускаем бота
     print("Бот запущен...")
